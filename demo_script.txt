@@ -1,0 +1,10 @@
+INSPECTION DEMO — 60 to 90 seconds
+
+1. “Our system takes CCTV/webcam or recorded video as input.”
+2. Start Webcam or upload a parking/road video.
+3. “YOLO detects vehicles in real time.”
+4. Point out the red rectangle: “This is the predefined restricted/no-parking zone.”
+5. When a vehicle enters and stays in the zone, explain: “The system tracks the vehicle and after the configured persistence time it flags a potential illegal parking violation.”
+6. Show the red ILLEGAL PARKING label.
+7. Show Recent Violation Records: “The incident is automatically recorded with vehicle type, time and status.”
+8. “Our current prototype focuses on detection, zone analysis, alerting and basic records. Automatic fines and government database integration are outside the initial scope.”

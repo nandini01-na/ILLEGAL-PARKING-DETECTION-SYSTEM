@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curbside AI Illegal Parking Surveillance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e17;
+            --bg-card: #111827;
+            --border-color: #1f2937;
+            --text-main: #e5e7eb;
+        }
+        body { background-color: var(--bg-primary); color: var(--text-main); font-family: 'Segoe UI', system-ui, sans-serif; }
+        .card { background-color: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; }
+        .stream-viewport { border: 2px solid var(--border-color); border-radius: 8px; overflow: hidden; background: #000; text-align: center; }
+        .stream-img { width: 100%; max-height: 480px; object-fit: contain; }
+        .stat-metric { font-size: 2.1rem; font-weight: 700; font-family: monospace; }
+        .live-pulse { animation: blinker 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes blinker { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .log-row { background: #1f2937; border-radius: 6px; padding: 10px; margin-bottom: 8px; border-left: 4px solid #ef4444; }
+        .state-pill { font-weight: 600; letter-spacing: 1px; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; }
+        .thumb-img { width: 75px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #4b5563; }
+        .progress-thin { height: 14px; border-radius: 7px; background-color: #1f2937; }
+    </style>
+</head>
+<body class="p-3">
+    <div class="container-fluid">
+        <!-- Header -->
+        <header class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary">
+            <div>
+                <h4 class="m-0 fw-bold text-white">🚦 Curbside AI Real-time Surveillance</h4>
+                <small class="text-secondary">Low-Latency YOLOv8 Engine & IoT Telemetry</small>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span id="mode-badge" class="badge bg-success live-pulse">● LIVE STREAM</span>
+                <span id="telemetry-pill" class="state-pill bg-success text-white">SYSTEM: CLEAR (GREEN)</span>
+                <span class="badge bg-dark border border-secondary text-info">NODE MCU: COM3</span>
+            </div>
+        </header>
+
+        <div class="row g-3">
+            <!-- Left: Video Feed & Controls -->
+            <div class="col-lg-8">
+                <div class="card p-3 shadow">
+                    <div class="stream-viewport mb-3">
+                        <img id="main-stream" src="/video_feed" class="stream-img" alt="Video Feed">
+                    </div>
+
+                    <!-- Row 1: Source Control Buttons -->
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 pb-2 border-bottom border-secondary">
+                        <div class="d-flex gap-1">
+                            <button class="btn btn-sm btn-info text-dark fw-bold" onclick="switchFeed('/start_phone')">📱 Phone Cam</button>
+                            <button class="btn btn-sm btn-primary" onclick="switchFeed('/start_webcam')">📷 Laptop Cam</button>
+                            <button class="btn btn-sm btn-danger" onclick="stopFeed()">⏹ Stop Feed</button>
+                            <button class="btn btn-sm btn-secondary" onclick="resetStats()">🔄 Full Reset</button>
+                        </div>
+                        <form id="uploadForm" class="d-flex gap-1">
+                            <input type="file" id="videoFile" accept="video/*" class="form-control form-control-sm bg-dark text-light border-secondary" style="width: 170px;">
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="uploadVideo()">Upload</button>
+                        </form>
+                    </div>
+
+                    <!-- Row 2: Zone Placement Controls -->
+                    <div class="d-flex align-items-center gap-2 pt-2">
+                        <span class="small text-secondary fw-bold">🎯 Zone Placement:</span>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button class="btn btn-outline-secondary text-light" onclick="changeZone('left')">⬅️ Left Lane</button>
+                            <button class="btn btn-outline-secondary text-light" onclick="changeZone('center')">⏺ Center</button>
+                            <button class="btn btn-outline-secondary text-light" onclick="changeZone('right')">➡️ Right Lane</button>
+                            <button class="btn btn-outline-secondary text-light active" onclick="changeZone('wide')">↔️ Full Curb</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Diagnostics, Timer, Fines & Incident Logs -->
+            <div class="col-lg-4">
+                <!-- Metrics -->
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <div class="card p-2 text-center">
+                            <div class="text-secondary small" style="font-size:0.75rem;">TRACKED</div>
+                            <div class="stat-metric text-info" id="v-count">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card p-2 text-center">
+                            <div class="text-secondary small" style="font-size:0.75rem;">VIOLATIONS</div>
+                            <div class="stat-metric text-danger" id="v-violations">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card p-2 text-center">
+                            <div class="text-secondary small" style="font-size:0.75rem;">FINES (₹)</div>
+                            <div class="stat-metric text-warning" id="v-fines">₹0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Countdown & Progress Bar -->
+                <div class="card p-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small fw-bold text-light">⏱️ Curbside Dwell Timer</span>
+                        <span class="badge bg-secondary" id="timer-val" style="font-size:0.9rem;">0.0s / 30s</span>
+                    </div>
+                    <div class="progress progress-thin mb-2">
+                        <div id="dwell-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%;"></div>
+                    </div>
+                    <div class="d-flex justify-content-between text-secondary" style="font-size: 0.72rem;">
+                        <span>0s (Clear)</span>
+                        <span>10s (Warning)</span>
+                        <span>30s (Violation)</span>
+                    </div>
+                </div>
+
+                <!-- Live Configuration -->
+                <div class="card p-3 mb-3 small">
+                    <div class="d-flex justify-content-between align-items-center mb-2 border-bottom border-secondary pb-1">
+                        <span class="fw-bold text-light">⚙️ Live Configuration</span>
+                        <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size:0.75rem;" onclick="clearLogs()">🗑️ Clear Logs</button>
+                    </div>
+                    <div class="d-flex justify-content-between text-secondary">
+                        <span>Active Zone:</span><span class="text-info fw-bold" id="cfg-zone">WIDE</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-secondary">
+                        <span>Timeline:</span><span class="text-light">0-10s (G) | 10-30s (Y) | 30s+ (R)</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-secondary">
+                        <span>Fine Unit:</span><span class="text-warning">₹500 / Incident</span>
+                    </div>
+                </div>
+
+                <!-- Incident Logs with Snapshot Preview -->
+                <div class="card p-3 shadow" style="max-height: 250px; overflow-y: auto;">
+                    <div class="d-flex justify-content-between align-items-center border-bottom border-secondary pb-2 mb-2">
+                        <h6 class="m-0 text-light">📋 Curbside Incident Log</h6>
+                        <span class="badge bg-danger">Auto-Snap</span>
+                    </div>
+                    <div id="log-list">
+                        <p class="text-secondary small">Curbside clear. Awaiting events...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script -->
+    <script>
+        function switchFeed(endpoint) {
+            fetch(endpoint).then(() => reloadStream()).catch(e => console.error(e));
+        }
+
+        function stopFeed() {
+            fetch('/stop_feed').then(() => {
+                document.getElementById('main-stream').src = "";
+                document.getElementById('mode-badge').innerText = "● FEED STOPPED";
+                document.getElementById('mode-badge').className = "badge bg-secondary";
+            });
+        }
+
+        function reloadStream() {
+            const stream = document.getElementById('main-stream');
+            stream.src = "/video_feed?t=" + new Date().getTime();
+            document.getElementById('mode-badge').innerText = "● LIVE STREAM";
+            document.getElementById('mode-badge').className = "badge bg-success live-pulse";
+        }
+
+        function changeZone(zoneType) {
+            fetch('/set_zone/' + zoneType)
+                .then(res => res.json())
+                .then(d => {
+                    document.getElementById('cfg-zone').innerText = d.zone.toUpperCase();
+                });
+        }
+
+        function uploadVideo() {
+            let fileInput = document.getElementById('videoFile');
+            if (fileInput.files.length === 0) {
+                alert("Please select a video file!");
+                return;
+            }
+            let formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+
+            fetch('/upload_video', { method: 'POST', body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        reloadStream();
+                    } else {
+                        alert("Upload failed: " + data.message);
+                    }
+                })
+                .catch(err => alert("Upload error: " + err));
+        }
+
+        function resetStats() {
+            fetch('/reset').then(() => updateTelemetry());
+        }
+
+        function clearLogs() {
+            fetch('/clear_logs').then(() => updateTelemetry());
+        }
+
+        function updateTelemetry() {
+            fetch('/stats')
+                .then(res => res.json())
+                .then(data => {
+                    // Update Counts & Fines
+                    document.getElementById('v-count').innerText = data.tracked || 0;
+                    document.getElementById('v-violations').innerText = data.violations || 0;
+                    document.getElementById('v-fines').innerText = '₹' + (data.total_fine || 0);
+                    document.getElementById('cfg-zone').innerText = (data.zone || 'WIDE').toUpperCase();
+
+                    // Mode Badge Sync
+                    if (data.mode === 'stopped') {
+                        document.getElementById('mode-badge').innerText = "● FEED STOPPED";
+                        document.getElementById('mode-badge').className = "badge bg-secondary";
+                    } else {
+                        document.getElementById('mode-badge').innerText = "● LIVE STREAM";
+                        document.getElementById('mode-badge').className = "badge bg-success live-pulse";
+                    }
+
+                    // Progress Bar & Duration
+                    const dur = data.duration || 0.0;
+                    document.getElementById('timer-val').innerText = dur.toFixed(1) + 's / 30s';
+                    const progBar = document.getElementById('dwell-progress');
+                    const pct = Math.min((dur / 30.0) * 100, 100);
+                    progBar.style.width = pct + '%';
+
+                    const pill = document.getElementById('telemetry-pill');
+                    if (dur >= 30.0 || data.status === 'VIOLATION') {
+                        pill.className = 'state-pill bg-danger text-white';
+                        pill.innerText = 'STATE: VIOLATION (RED)';
+                        progBar.className = 'progress-bar bg-danger';
+                    } else if (dur >= 10.0 || data.status === 'WARNING') {
+                        pill.className = 'state-pill bg-warning text-dark';
+                        pill.innerText = 'STATE: WARNING (YELLOW)';
+                        progBar.className = 'progress-bar bg-warning';
+                    } else {
+                        pill.className = 'state-pill bg-success text-white';
+                        pill.innerText = 'STATE: CLEAR (GREEN)';
+                        progBar.className = 'progress-bar bg-success';
+                    }
+
+                    // Render Incident Logs with Snapshots
+                    const logs = data.incident_logs || [];
+                    if (logs.length > 0) {
+                        let html = '';
+                        logs.forEach(l => {
+                            let snap = l.snapshot ? `<img src="${l.snapshot}" class="thumb-img ms-2" alt="Violation">` : '';
+                            html += `
+                                <div class="log-row small">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong class="text-white">${l.vehicle_id} (${l.class})</strong>
+                                            <span class="badge bg-danger ms-1">${l.fine || '₹500'}</span>
+                                            <div class="text-secondary" style="font-size:0.75rem; margin-top:2px;">${l.timestamp}</div>
+                                        </div>
+                                        ${snap}
+                                    </div>
+                                </div>`;
+                        });
+                        document.getElementById('log-list').innerHTML = html;
+                    } else {
+                        document.getElementById('log-list').innerHTML = '<p class="text-secondary small">Curbside clear. Awaiting events...</p>';
+                    }
+                })
+                .catch(() => {});
+        }
+        setInterval(updateTelemetry, 1000);
+    </script>
+</body>
+</html>

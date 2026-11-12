@@ -1,0 +1,79 @@
+#include <LiquidCrystal.h>
+
+// Traffic Light Module Pin Definition (NodeMCU ESP8266)
+const int RED_PIN    = D1; // GPIO5
+const int YELLOW_PIN = D2; // GPIO4
+const int GREEN_PIN  = D3; // GPIO0
+
+// 16x2 LCD Display Pins (Parallel 4-bit)
+// RS -> D4, EN -> D5, D4 -> D6, D5 -> D7, D6 -> D8, D7 -> RX (GPIO3)
+const int rs = D4, en = D5, d4 = D6, d5 = D7, d6 = D8, d7 = 3;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup() {
+  Serial.begin(9600);
+  
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(YELLOW_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
+
+  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.print("AI PARK SENTRY");
+  lcd.setCursor(0, 1);
+  lcd.print("SYS INITIALIZING");
+  delay(1200);
+
+  // Set default state to Clear
+  setClearState();
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char cmd = Serial.read();
+
+    if (cmd == 'V') {
+      setViolationState();
+    } else if (cmd == 'W') {
+      setWarningState();
+    } else if (cmd == 'C') {
+      setClearState();
+    }
+  }
+}
+
+void setClearState() {
+  digitalWrite(GREEN_PIN, HIGH);
+  digitalWrite(YELLOW_PIN, LOW);
+  digitalWrite(RED_PIN, LOW);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ZONE: CLEAR");
+  lcd.setCursor(0, 1);
+  lcd.print("ALL LANES FREE");
+}
+
+void setWarningState() {
+  digitalWrite(GREEN_PIN, LOW);
+  digitalWrite(YELLOW_PIN, HIGH);
+  digitalWrite(RED_PIN, LOW);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ZONE OCCUPIED");
+  lcd.setCursor(0, 1);
+  lcd.print("TIMER RUNNING...");
+}
+
+void setViolationState() {
+  digitalWrite(GREEN_PIN, LOW);
+  digitalWrite(YELLOW_PIN, LOW);
+  digitalWrite(RED_PIN, HIGH);
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("! ILLEGAL PARK !");
+  lcd.setCursor(0, 1);
+  lcd.print("EVIDENCE LOGGED");
+}
